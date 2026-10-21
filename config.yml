@@ -192,7 +192,8 @@ apps:
     package_name: "com.zhiliaoapp.musically"
     apkmirror:
       org: "tiktok-pte-ltd"
-      app: "tik-tok"
+      app: "tik-tok-including-musical-ly"
+      release_prefix: "tiktok"
     patches:
       repo: "icysymmetra/tiktok-patches-for-morphe"
       channel: "latest"
