@@ -33,7 +33,7 @@ defaults:
   # You may list as many of these as you want; one output file is built per
   # entry.
   # With no app-level override, build the universal APK.
-  architectures: ["universal"]
+  architectures: ["arm64-v8a"]
 
   # Optional source DPI. Examples: 480, 480dpi, anydpi, or nodpi.
   # If omitted, anydpi/nodpi is preferred automatically. If a requested DPI
@@ -95,8 +95,8 @@ apps:
       # channel: "dev"                       # uncomment to track dev/pre-release patches
 
     # YouTube ships both, matching Morphe's own default recommendation.
-    build_mode: "both"
-    architectures: ["arm64-v8a", "universal"]
+    build_mode: "apk"
+    architectures: ["arm64-v8a"]
 
     # Only read when build_mode is "module" or "both".
     module:
@@ -120,8 +120,8 @@ apps:
       app: "youtube-music"
     patches:
       repo: "MorpheApp/morphe-patches"
-    build_mode: "both"
-    architectures: ["arm64-v8a", "universal"]
+    build_mode: "apk"
+    architectures: ["arm64-v8a"]
     module:
       id: "morphe-youtube-music"
       author: "subashbuilds"
