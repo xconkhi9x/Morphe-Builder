@@ -185,3 +185,18 @@ apps:
 #    architectures: ["universal"]
 #    include_patches: []
 #    exclude_patches: []
+
+  - id: tiktok
+    enabled: true
+    name: "TikTok"
+    package_name: "com.zhiliaoapp.musically"
+    apkmirror:
+      org: "tiktok-pte-ltd"
+      app: "tik-tok"
+    patches:
+      repo: "icysymmetra/tiktok-patches-for-morphe"
+      channel: "latest"
+    build_mode: "apk"
+    architectures: ["arm64-v8a"]
+    include_patches: []
+    exclude_patches: []
