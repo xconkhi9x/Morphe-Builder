@@ -86,9 +86,9 @@ _DPI_PATTERN = re.compile(
 def _normalize_architecture(value: str) -> str:
     normalized = value.strip().lower()
     compact = re.sub(r"[-_\s]+", "", normalized)
-    # Compare canonical tokens so x86_64 can never collapse into x86 while
-    # still accepting APKMirror's occasional x86-64 spelling.
-    for architecture in _KNOWN_ARCHITECTURES:
+    # Check arm64-v8a and x86_64 first before 32-bit counterparts
+    order = ("arm64-v8a", "x86_64", "armeabi-v7a", "x86", "universal")
+    for architecture in order:
         canonical = re.sub(r"[-_\s]+", "", architecture)
         if canonical in compact:
             return architecture
