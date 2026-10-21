@@ -2,7 +2,7 @@ name: Build (all enabled apps)
 
 on:
   schedule:
-    - cron: '0 0 * * 0' 
+    - cron: '0 0 1 * *' 
       timezone: Asia/Kolkata
   workflow_dispatch:
     inputs:
@@ -80,6 +80,31 @@ jobs:
           FLARESOLVERR_URL: http://localhost:8191
         run: |
           uv run main.py ${{ inputs.force && '--force' || '' }}
+
+      - name: Send APKs and Notification to Discord
+        if: steps.try_building.outputs.has_output == 'true'
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+        run: |
+          if [ -z "$DISCORD_WEBHOOK" ]; then
+            echo "DISCORD_WEBHOOK not set, skipping."
+            exit 0
+          fi
+          echo "Sending notification and artifacts to Discord..."
+          for file in $(find ./output -name "*.apk" 2>/dev/null); do
+            [ -e "$file" ] || continue
+            filename=$(basename "$file")
+            filesize=$(stat -c%s "$file")
+            if [ "$filesize" -le 25000000 ]; then
+              echo "Uploading $filename to Discord..."
+              curl -s -F "file=@$file" -F "content=📱 **Morphe Build:** `$filename`" "$DISCORD_WEBHOOK" || true
+            else
+              echo "File $filename is larger than 25MB, skipping direct attachment."
+            fi
+          done
+
+          RELEASE_URL="https://github.com/${{ github.repository }}/releases"
+          curl -s -H "Content-Type: application/json" -X POST -d '{"content": "✅ **Morphe Build Hoàn Tất!**\nCác bản cập nhật mới nhất đã được đẩy lên GitHub Releases:\n🔗 https://github.com/'"${{ github.repository }}"'/releases"}' "$DISCORD_WEBHOOK" || true
 
       - name: Generate Attestations
         if: steps.try_building.outputs.has_output == 'true'
