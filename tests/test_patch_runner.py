@@ -1,9 +1,10 @@
+import os
 import tempfile
 import unittest
 from unittest.mock import patch
 
 from config import AppConfig, SourceConfig
-from patch_runner import build_all_outputs
+from patch_runner import _run_patch_command, build_all_outputs
 
 
 class PatchRunnerTests(unittest.TestCase):
@@ -43,6 +44,92 @@ class PatchRunnerTests(unittest.TestCase):
             self.assertTrue(outputs[1].path.endswith("demo-v1.2.3-universal-480dpi.apk"))
             self.assertEqual(patch_command.call_args_list[0].kwargs["apk_path"], arm_source)
             self.assertEqual(patch_command.call_args_list[1].kwargs["apk_path"], universal_source)
+
+
+    def test_multiple_patch_sources_are_all_passed_to_one_run(self):
+        app = AppConfig(
+            id="demo",
+            name="Demo",
+            package_name="com.example.demo",
+            apkmirror_org="example",
+            apkmirror_app="demo",
+            apkmirror_release_prefix="demo",
+            patches=SourceConfig("owner/patches", r"^patches.*\.mpp$"),
+            cli=SourceConfig("owner/cli", r"^cli.*\.jar$"),
+            build_mode="apk",
+            architectures=["arm64-v8a"],
+            extra_patches=[SourceConfig("other/second", r"^patches.*\.rvp$")],
+            include_patches=[["HushGram patch"], ["Extra patch", "HushGram patch"]],
+            exclude_patches=["Ads"],
+        )
+
+        with tempfile.TemporaryDirectory() as output_dir:
+            with patch("patch_runner._run_patch_command") as patch_command:
+                build_all_outputs(
+                    app=app,
+                    cli_jar="cli.jar",
+                    patches_files=["primary.mpp", "secondary.rvp"],
+                    downloaded_apk_paths={"arm64-v8a": "/tmp/arm.apk"},
+                    version="1.0.0",
+                    output_dir=output_dir,
+                )
+
+            self.assertEqual(
+                patch_command.call_args_list[0].kwargs["patches_files"],
+                ["primary.mpp", "secondary.rvp"],
+            )
+            # Per-source include lists are unioned; flat excludes apply to both.
+            self.assertEqual(
+                patch_command.call_args_list[0].kwargs["include_patches"],
+                ["HushGram patch", "Extra patch"],
+            )
+            self.assertEqual(
+                patch_command.call_args_list[0].kwargs["exclude_patches"], ["Ads"]
+            )
+
+
+class PatchRunnerBundleTests(unittest.TestCase):
+    """The Morphe CLI merges split containers itself, but needs an absolute
+    path (it symlinks the bundle into its temp dir), and an unpacked
+    directory of splits is rejected."""
+
+    def test_relative_apkm_input_is_passed_to_cli_as_absolute_path(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            bundle = os.path.join(tmp, "app.apkm")
+            with open(bundle, "wb") as f:
+                f.write(b"not-a-real-zip")
+            out_path = os.path.join(tmp, "out.apk")
+
+            seen = {}
+
+            def fake_run(command, capture_output, text):
+                seen["command"] = command
+                open(out_path, "wb").write(b"patched")
+
+                class Done:
+                    returncode = 0
+                    stdout = ""
+                    stderr = ""
+
+                return Done()
+
+            with patch("patch_runner.subprocess.run", side_effect=fake_run):
+                _run_patch_command(
+                    cli_jar="cli.jar",
+                    patches_files=["patches.mpp"],
+                    apk_path=os.path.relpath(bundle),
+                    out_path=out_path,
+                    include_patches=None,
+                    exclude_patches=None,
+                    striplibs="arm64-v8a",
+                    force=False,
+                )
+
+            # Absolute path: the CLI symlinks the bundle into its own temp dir,
+            # which dangles for a relative path.
+            self.assertTrue(os.path.isabs(seen["command"][-1]))
+            self.assertEqual(seen["command"][-1], os.path.abspath(bundle))
+            self.assertIn("--striplibs=arm64-v8a", seen["command"])
 
 
 if __name__ == "__main__":
